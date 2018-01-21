@@ -78,7 +78,9 @@
 -include_lib("eunit/include/eunit.hrl").
 
 %% Maximum number of distinct database instances to create in any test.
-%% This is driven by filesystem size constraints on builders.
+%% The highest runtime limit used is the lower of this value or
+%%  ((num-schedulers x 4) + 1).
+%% This limit is driven by filesystem size constraints on builders.
 -define(MAX_TEST_OPEN, 49).
 -endif. % TEST
 
@@ -491,24 +493,24 @@ init_nif_lib([], _, _, Errors) ->
 %% ===================================================================
 
 -spec assert_close(DbRef :: db_ref()) -> ok | no_return().
-%
-% Closes DbRef inside an ?assert... macro.
-%
+%%
+%% Closes DbRef inside an ?assert... macro.
+%%
 assert_close(DbRef) ->
     ?assertEqual(ok, ?MODULE:close(DbRef)).
 
 -spec assert_open(DbPath :: string()) -> db_ref() | no_return().
-%
-% Opens Path inside an ?assert... macro, creating the database directory if needed.
-%
+%%
+%% Opens Path inside an ?assert... macro, creating the database directory if needed.
+%%
 assert_open(DbPath) ->
     assert_open(DbPath, [{create_if_missing, true}]).
 
 -spec assert_open(DbPath :: string(), OpenOpts :: open_options())
             -> db_ref() | no_return().
-%
-% Opens DbPath, with OpenOpts, inside an ?assert... macro.
-%
+%%
+%% Opens DbPath, with OpenOpts, inside an ?assert... macro.
+%%
 assert_open(DbPath, OpenOpts) ->
     OpenRet = ?MODULE:open(DbPath, OpenOpts),
     ?assertMatch({ok, _}, OpenRet),
@@ -516,35 +518,35 @@ assert_open(DbPath, OpenOpts) ->
     DbRef.
 
 -spec assert_open_small(DbPath :: string()) -> db_ref() | no_return().
-%
-% Opens Path inside an ?assert... macro, using a limited storage footprint
-% and creating the database directory if needed.
-%
+%%
+%% Opens Path inside an ?assert... macro, using a limited storage footprint
+%% and creating the database directory if needed.
+%%
 assert_open_small(DbPath) ->
     assert_open(DbPath, [{create_if_missing, true}, {limited_developer_mem, true}]).
 
 -spec create_test_dir() -> string() | no_return().
-%
-% Creates a new, empty, uniquely-named directory for testing and returns
-% its full path. This operation *should* never fail, but would raise an
-% ?assert...-ish exception if it did.
-%
+%%
+%% Creates a new, empty, uniquely-named directory for testing and returns
+%% its full path. This operation *should* never fail, but would raise an
+%% ?assert...-ish exception if it did.
+%%
 create_test_dir() ->
     string:strip(?cmd("mktemp -d /tmp/" ?MODULE_STRING ".XXXXXXX"), both, $\n).
 
 -spec delete_test_dir(Dir :: string()) -> ok | no_return().
-%
-% Deletes a test directory fully, whether or not it exists.
-% This operation *should* never fail, but would raise an ?assert...-ish
-% exception if it did.
-%
+%%
+%% Deletes a test directory fully, whether or not it exists.
+%% This operation *should* never fail, but would raise an ?assert...-ish
+%% exception if it did.
+%%
 delete_test_dir(Dir) ->
     ?assertCmd("rm -rf " ++ Dir).
 
 -spec terminal_format(Fmt :: io:format(), Args :: list()) -> ok.
-%
-% Writes directly to the terminal, bypassing EUnit hooks.
-%
+%%
+%% Writes directly to the terminal, bypassing EUnit hooks.
+%%
 terminal_format(Fmt, Args) ->
     io:format(user, Fmt, Args).
 
@@ -560,7 +562,7 @@ terminal_format(Fmt, Args) ->
     end
 ).
 -define(local_test(TestFunc), ?local_test(10, TestFunc)).
--define(max_test_open(Calc), erlang:min(?MAX_TEST_OPEN, Calc)).
+-define(max_test_open(Calc),  erlang:min(?MAX_TEST_OPEN, Calc)).
 
 eleveldb_test_() ->
     {foreach,
@@ -590,13 +592,13 @@ eleveldb_test_() ->
         ]
     }.
 
-% fold accumulator used in a few tests
+%% fold accumulator used in a few tests
 accumulate(Val, Acc) ->
     [Val | Acc].
 
-%
-% Individual tests
-%
+%%
+%% Individual tests
+%%
 
 test_open(TestDir) ->
     Ref = assert_open(TestDir),
@@ -606,9 +608,9 @@ test_open(TestDir) ->
     assert_close(Ref).
 
 test_open_many(TestDir, HowMany) ->
-    Insts = lists:seq(1, HowMany),
-    KNonce = erlang:make_ref(),
-    VNonce = erlang:self(),
+    Insts   = lists:seq(1, HowMany),
+    KNonce  = erlang:make_ref(),
+    VNonce  = erlang:self(),
     WorkSet = [
         begin
             D = lists:flatten(io_lib:format("~s.~b", [TestDir, N])),
@@ -710,9 +712,9 @@ test_close_fold(TestDir) ->
     ?assertError(badarg,
         ?MODULE:fold(Ref, fun(_, _) -> assert_close(Ref) end, undefined, [])).
 
-%
-% Parallel tests
-%
+%%
+%% Parallel tests
+%%
 
 parallel_test_() ->
     ParaCnt = ?max_test_open(erlang:system_info(schedulers) * 2 + 1),
@@ -732,10 +734,10 @@ parallel_test_() ->
     }.
 
 run_load(TestDir, IntSeq) ->
-    KNonce = [os:timestamp(), erlang:self()],
-    Ref = assert_open_small(TestDir),
-    VNonce = [erlang:make_ref(), os:timestamp()],
-    KVIn = [
+    KNonce  = [os:timestamp(), erlang:self()],
+    Ref     = assert_open_small(TestDir),
+    VNonce  = [erlang:make_ref(), os:timestamp()],
+    KVIn    = [
         begin
             K = erlang:phash2([N | KNonce], 1 bsl 32),
             V = erlang:phash2([N | VNonce], 1 bsl 32),
@@ -745,8 +747,8 @@ run_load(TestDir, IntSeq) ->
         fun({Key, Val}) ->
             ?assertEqual(ok, ?MODULE:put(Ref, Key, Val, []))
         end, KVIn),
-    {L, R} = lists:split(erlang:hd(IntSeq), KVIn),
-    KVOut = R ++ L,
+    {L, R}  = lists:split(erlang:hd(IntSeq), KVIn),
+    KVOut   = R ++ L,
     lists:foreach(
         fun({Key, Val}) ->
             ?assertEqual({ok, Val}, ?MODULE:get(Ref, Key, []))
@@ -801,8 +803,8 @@ prop_put_delete(TestDir) ->
                 %% Validate that all deleted values return not_found
                 lists:foreach(
                     fun({K, deleted}) ->
-                        ?assertEqual(not_found, ?MODULE:get(Ref, K, []));
-                        ({K, V}) ->
+                            ?assertEqual(not_found, ?MODULE:get(Ref, K, []));
+                       ({K, V}) ->
                             ?assertEqual({ok, V}, ?MODULE:get(Ref, K, []))
                     end, Model),
 
@@ -825,7 +827,7 @@ prop_put_delete_test_() ->
                 TestDir = filename:join(TestRoot, "putdelete.qc"),
                 InnerTO = Timeout1,
                 OuterTO = (InnerTO * 3),
-                Title = "Without ?ALWAYS()",
+                Title   = "Without ?ALWAYS()",
                 TestFun = fun() ->
                     qc(eqc:testing_time(InnerTO, prop_put_delete(TestDir)))
                 end,
@@ -839,7 +841,7 @@ prop_put_delete_test_() ->
                 %% We use the ?ALWAYS(AwCount, ...) wrapper as a regression test.
                 %% It's not clear how this is effectively different than the first
                 %% fixture, but I'm leaving it here in case I'm missing something.
-                Title = lists:flatten(io_lib:format("With ?ALWAYS(~b)", [AwCount])),
+                Title   = lists:flatten(io_lib:format("With ?ALWAYS(~b)", [AwCount])),
                 TestFun = fun() ->
                     qc(eqc:testing_time(InnerTO,
                         ?ALWAYS(AwCount, prop_put_delete(TestDir))))
