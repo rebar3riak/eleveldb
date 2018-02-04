@@ -1,12 +1,25 @@
 language: erlang
 notifications:
-  webhooks: http://basho-engbot.herokuapp.com/travis?key=a5be8bf3dea048bd7c5c1e93a37da1ab29709f51
-  email: eng@basho.com
+  email: false
+script:
+  # clean relevant profiles to ensure they succeed
+  - rebar3 clean --all
+  - rebar3 as prod clean --all
+  - rebar3 as check clean --all
+  - rebar3 as test clean --all
+  - rebar3 as validate clean --all
+  # compile relevant profiles to ensure they succeed
+  # - rebar3 as validate compile
+  - rebar3 compile
+  - rebar3 as prod compile
+  - rebar3 as check compile
+  - rebar3 as test compile
+  # these are the real tests
+  # - rebar3 as check brt-deps --check
+  - rebar3 as check xref
+  - rebar3 as check dialyzer
+  - rebar3 eunit
+  # last, but not least, do the docs build?
+  - rebar3 edoc
 otp_release:
-  - R15B02
-  - R15B01
-  - R15B
-  - R14B04
-  - R14B03
-# - R15B03
-
+  - 20.2.2
